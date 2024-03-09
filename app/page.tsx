@@ -1,39 +1,84 @@
-import Link from "next/link"
+"use client"
 
-import { siteConfig } from "@/config/site"
-import { buttonVariants } from "@/components/ui/button"
+import React, { useEffect, useState } from "react"
+
+import { Icons } from "@/components/icons"
+
+import S3Image from "./s3image"
+
+const fetchDocuments = async (path: string) => {
+  const response = await fetch(path)
+  if (!response.ok) throw new Error("Network response was not ok")
+  return await response.json()
+}
 
 export default function IndexPage() {
+  const [data, setData] = useState<{ Key?: string }[] | null>(null)
+
+  useEffect(() => {
+    fetchDocuments("/api/documents")
+      .then((data: { Key?: string }[]) => {
+        setData(data)
+      })
+      .catch((error) => {
+        console.error("Error fetching documents:", error)
+        setData(null)
+      })
+  }, [])
+
+  if (!data) {
+    return <div>no images</div>
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const formData = new FormData()
+      Array.from(e.target.files).forEach((file) => {
+        formData.append("file", file)
+      })
+
+      try {
+        const response = await fetch("/api/documents", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log(result)
+        } else {
+          throw new Error("Network response was not ok")
+        }
+      } catch (error) {
+        console.error("Error uploading file:", error)
+      }
+    }
+  }
+
   return (
-    <section className="container grid items-center gap-6 pb-8 pt-6 md:py-10">
-      <div className="flex max-w-[980px] flex-col items-start gap-2">
-        <h1 className="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">
-          Beautifully designed components <br className="hidden sm:inline" />
-          built with Radix UI and Tailwind CSS.
-        </h1>
-        <p className="max-w-[700px] text-lg text-muted-foreground">
-          Accessible and customizable components that you can copy and paste
-          into your apps. Free. Open Source. And Next.js 13 Ready.
-        </p>
-      </div>
-      <div className="flex gap-4">
-        <Link
-          href={siteConfig.links.docs}
-          target="_blank"
-          rel="noreferrer"
-          className={buttonVariants()}
+    <div className="relative">
+      <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
+        {data.map((doc, index) => (
+          <S3Image Key={doc.Key ?? ""} key={doc.Key ?? index} />
+        ))}
+        <label
+          className="flex h-full min-h-[100px] cursor-pointer items-center justify-center rounded-lg bg-accent p-4 hover:opacity-70"
+          htmlFor="multi"
         >
-          Documentation
-        </Link>
-        <Link
-          target="_blank"
-          rel="noreferrer"
-          href={siteConfig.links.github}
-          className={buttonVariants({ variant: "outline" })}
-        >
-          GitHub
-        </Link>
+          <div className="flex items-center gap-1">
+            <Icons.moon className="size-4 text-ellipsis" />
+            <p>Upload</p>
+          </div>
+        </label>
       </div>
-    </section>
+      <input
+        style={{ visibility: "hidden", position: "absolute", width: 0 }}
+        type="file"
+        id="multi"
+        multiple
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+    </div>
   )
 }
